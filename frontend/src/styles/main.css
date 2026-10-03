@@ -1,0 +1,316 @@
+/* 城市集中供热 · 热源与管网调度管理 —— 全局样式 / Element Plus 主题覆盖 */
+:root {
+  --hs-primary: #0d47a1;
+  --hs-primary-deep: #0a3981;
+  --hs-primary-soft: #e7ecf6;
+  --hs-hot: #f08c2a;
+  --hs-cool: #2f80ed;
+  --hs-ok: #2ea44f;
+  --hs-danger: #e34d4d;
+  --hs-ink: #16324f;
+  --hs-muted: #6b7f99;
+  --hs-line: #d8e0ec;
+  --hs-bg: #eef2f7;
+
+  --el-color-primary: #0d47a1;
+  --el-color-primary-light-3: #567ebd;
+  --el-color-primary-light-5: #86a3d0;
+  --el-color-primary-light-7: #b6c8e3;
+  --el-color-primary-light-8: #cedaec;
+  --el-color-primary-light-9: #e7ecf6;
+  --el-color-primary-dark-2: #0a3981;
+  --el-color-danger: #e34d4d;
+  --el-color-success: #2ea44f;
+  --el-color-warning: #f08c2a;
+  --el-border-radius-base: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  color: var(--hs-ink);
+  background: var(--hs-bg);
+}
+
+/* ---------- 通用面板 ---------- */
+.hs-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px 18px;
+  overflow: auto;
+}
+
+.hs-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hs-head h2 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: 0.5px;
+  color: var(--hs-primary-deep);
+}
+
+.hs-head .hs-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--hs-muted);
+}
+
+.hs-panel {
+  background: #fff;
+  border: 1px solid var(--hs-line);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(13, 71, 161, 0.06);
+}
+
+.hs-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hs-line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hs-primary-deep);
+}
+
+.hs-panel-title::before {
+  content: "";
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--hs-primary);
+}
+
+.hs-panel-body {
+  padding: 12px 14px;
+}
+
+.hs-metrics {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.hs-metric {
+  flex: 1 1 150px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f5f8fd, #e9eff8);
+  border: 1px solid var(--hs-line);
+}
+
+.hs-metric .label {
+  font-size: 12px;
+  color: var(--hs-muted);
+}
+
+.hs-metric .value {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--hs-primary-deep);
+}
+
+.hs-metric.danger .value {
+  color: var(--hs-danger);
+}
+
+.hs-metric.warn .value {
+  color: var(--hs-hot);
+}
+
+.hs-muted {
+  color: var(--hs-muted);
+}
+
+/* ---------- 管径筛选条 ---------- */
+.dn-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dn-chip {
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--hs-line);
+  background: #f7f9fc;
+  font-size: 12px;
+  color: #375073;
+  transition: all 0.18s ease;
+}
+
+.dn-chip:hover {
+  border-color: var(--hs-primary-light-5);
+}
+
+.dn-chip.active {
+  background: var(--hs-primary);
+  border-color: var(--hs-primary);
+  color: #fff;
+  box-shadow: inset 0 -3px 0 rgba(255, 255, 255, 0.28);
+}
+
+/* ---------- 通用小标签 ---------- */
+.hs-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 20px;
+  border: 1px solid transparent;
+}
+
+.hs-tag.ok {
+  color: var(--hs-ok);
+  background: rgba(46, 164, 79, 0.12);
+  border-color: rgba(46, 164, 79, 0.32);
+}
+
+.hs-tag.warn {
+  color: var(--hs-hot);
+  background: rgba(240, 140, 42, 0.13);
+  border-color: rgba(240, 140, 42, 0.32);
+}
+
+.hs-tag.danger {
+  color: var(--hs-danger);
+  background: rgba(227, 77, 77, 0.12);
+  border-color: rgba(227, 77, 77, 0.32);
+}
+
+.hs-tag.info {
+  color: var(--hs-primary);
+  background: rgba(13, 71, 161, 0.1);
+  border-color: rgba(13, 71, 161, 0.28);
+}
+
+/* ---------- 表格里的欠费行 ---------- */
+.el-table .hs-arrear-row {
+  --el-table-tr-bg-color: #fff4f4;
+}
+
+.el-table .hs-arrear-row td.el-table__cell {
+  color: #a33232;
+}
+
+/* ---------- 看板卡片 ---------- */
+.kanban-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  background: #f6f8fb;
+  border: 1px solid var(--hs-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kanban-col.drop-over {
+  border-color: var(--hs-primary);
+  box-shadow: inset 0 0 0 2px rgba(13, 71, 161, 0.18);
+}
+
+.kanban-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--hs-primary);
+}
+
+.kanban-head.todo {
+  background: #3f6fbb;
+}
+
+.kanban-head.doing {
+  background: var(--hs-hot);
+}
+
+.kanban-head.done {
+  background: var(--hs-ok);
+}
+
+.kanban-body {
+  flex: 1;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+}
+
+.kanban-card {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--hs-line);
+  border-left: 4px solid var(--hs-primary);
+  border-radius: 8px;
+  cursor: grab;
+  box-shadow: 0 1px 4px rgba(22, 50, 79, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kanban-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(22, 50, 79, 0.16);
+}
+
+.kanban-card.dragging {
+  opacity: 0.5;
+}
+
+.kanban-card.fault-no-heat {
+  border-left-color: var(--hs-cool);
+}
+
+.kanban-card.fault-leak {
+  border-left-color: var(--hs-primary);
+}
+
+.kanban-card.fault-noise {
+  border-left-color: var(--hs-hot);
+}
+
+.kanban-card.fault-air {
+  border-left-color: #8b6fd0;
+}
+
+/* ---------- 室温格子闪烁 ---------- */
+@keyframes hs-blink {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 128, 237, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(47, 128, 237, 0);
+  }
+}
+
+.cell-blink {
+  animation: hs-blink 1.4s infinite;
+}
