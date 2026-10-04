@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,4 +31,10 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, Long> 
     List<RepairOrder> findByReportedDateBetweenOrderByReportedDateDesc(LocalDate from, LocalDate to);
 
     long countByReportedDate(LocalDate reportedDate);
+
+    /** 归并：工单改挂（工单号、报修日期、处理结果、状态一律不动），批量更新只改关联外键 */
+    @Modifying
+    @Query("update RepairOrder o set o.resident = :keeper where o.resident = :merged")
+    int reassignResident(@Param("keeper") com.heat.supply.domain.Resident keeper,
+                         @Param("merged") com.heat.supply.domain.Resident merged);
 }

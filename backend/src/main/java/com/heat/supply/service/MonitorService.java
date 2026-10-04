@@ -92,6 +92,14 @@ public class MonitorService {
 
     @Transactional(readOnly = true)
     public List<ResidentVO> listResidents(Long stationId, String community) {
+        return listResidents(stationId, community, false);
+    }
+
+    /**
+     * @param includeMerged 是否带出已归并只读档案（归并页审计/跳转用 true，业务列表默认 false）
+     */
+    @Transactional(readOnly = true)
+    public List<ResidentVO> listResidents(Long stationId, String community, boolean includeMerged) {
         List<Resident> residents;
         if (stationId != null) {
             residents = residentRepository.findByStationIdOrderByBuildingNoAscUnitNoAsc(stationId);
@@ -102,6 +110,9 @@ public class MonitorService {
         }
         List<ResidentVO> result = new ArrayList<>();
         for (Resident resident : residents) {
+            if (!includeMerged && resident.isMerged()) {
+                continue;
+            }
             result.add(toResidentVo(resident));
         }
         return result;
@@ -131,6 +142,9 @@ public class MonitorService {
         TreeSet<String> buildings = new TreeSet<>();
         TreeSet<String> units = new TreeSet<>();
         for (Resident resident : residents) {
+            if (resident.isMerged()) {
+                continue;
+            }
             buildings.add(nvl(resident.getBuildingNo()));
             units.add(nvl(resident.getUnitNo()));
             String key = nvl(resident.getBuildingNo()) + "#" + nvl(resident.getUnitNo());
@@ -215,6 +229,11 @@ public class MonitorService {
     public RoomTempVO recordSample(RoomTempRequest request) {
         Resident resident = residentRepository.findById(request.getResidentId())
                 .orElseThrow(() -> new BizException("热用户不存在：id=" + request.getResidentId()));
+        if (resident.isMerged()) {
+            throw new BizException("档案 " + resident.getId() + " 已归并（归并单 " + resident.getMergeNo()
+                    + "），为只读档案，不能录入抽测；请到保留档案 "
+                    + resident.getMergedInto().getId() + " 办理");
+        }
         BigDecimal temperature = request.getTemperature();
         if (temperature == null) {
             throw new BizException("请填写抽测室温（℃）");
@@ -258,16 +277,26 @@ public class MonitorService {
         if (Boolean.TRUE.equals(sample.getQualified())) {
             throw new BizException("该次抽测室温 " + sample.getTemperature() + "℃ 已达标，无需生成报修工单");
         }
+        Resident sampleResident = sample.getResident();
+        if (sampleResident != null && sampleResident.isMerged()) {
+            throw new BizException("该抽测记录挂在已归并只读档案下（归并单 " + sampleResident.getMergeNo()
+                    + "），请到保留档案办理报修");
+        }
         return repairOrderService.createFromTemp(sample);
     }
 
     /**
-     * 报停 / 恢复供热：欠费用户不允许办理。
+     * 报停 / 恢复供热：欠费用户不允许办理；已归并只读档案禁止操作。
      */
     @Transactional
     public ResidentVO changeSupplyStatus(Long residentId, SupplyChangeRequest request) {
         Resident resident = residentRepository.findById(residentId)
                 .orElseThrow(() -> new BizException("热用户不存在：id=" + residentId));
+        if (resident.isMerged()) {
+            throw new BizException("档案 " + residentId + " 已归并（归并单 " + resident.getMergeNo()
+                    + "），为只读档案，供热状态以保留档案 "
+                    + resident.getMergedInto().getId() + " 为准，不能单独报停 / 恢复");
+        }
         String target = request.getSupplyStatus();
         if (!Dict.isValidSupplyStatus(target)) {
             throw new BizException("供热状态只能是：正常供热 / 已报停");
@@ -329,7 +358,10 @@ public class MonitorService {
                 station == null ? null : station.getName(),
                 resident.getSupplyStatus(),
                 resident.getContactPhone(),
-                feeRepository.sumArrearsByResident(resident.getId()));
+                feeRepository.sumArrearsByResident(resident.getId()),
+                resident.isMerged(),
+                resident.getMergedInto() == null ? null : resident.getMergedInto().getId(),
+                resident.getMergeNo());
     }
 
     private BigDecimal nvl(BigDecimal value) {

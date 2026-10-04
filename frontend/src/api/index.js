@@ -65,10 +65,29 @@ export const orderApi = {
 }
 
 export const feeApi = {
-  list: (year) => unwrap(http.get('/fees', { params: { year } })),
+  list: (year, includeVoided) =>
+    unwrap(http.get('/fees', { params: { year, includeVoided } })),
   arrearsRank: () => unwrap(http.get('/fees/arrears-rank')),
   years: () => unwrap(http.get('/fees/years')),
-  pay: (id, payload) => unwrap(http.post(`/fees/${id}/pay`, payload))
+  pay: (id, payload) => unwrap(http.post(`/fees/${id}/pay`, payload)),
+  /** 归并后待财务复核台账 */
+  reviews: () => unwrap(http.get('/fees/reviews')),
+  /** 财务复核完成：双份实收收口为一条，重复行作废 */
+  resolveReview: (payload) => unwrap(http.post('/fees/reviews/resolve', payload))
+}
+
+export const residentMergeApi = {
+  /** 疑似重复候选（同址在档档案） */
+  candidates: () => unwrap(http.get('/residents/merge/candidates')),
+  /** 归并预检 */
+  preview: (keeperId, mergedId) =>
+    unwrap(http.get('/residents/merge/preview', { params: { keeperId, mergedId } })),
+  /** 确认归并（状态不一致时带 chosenSupplyStatus） */
+  confirm: (payload) => unwrap(http.post('/residents/merge/confirm', payload)),
+  /** 按地址 / 热表号 / 旧档案编号查询，已归并的自动跳到保留档案 */
+  resolve: (keyword) => unwrap(http.get('/residents/merge/resolve', { params: { keyword } })),
+  /** 归并审计 */
+  audits: () => unwrap(http.get('/residents/merge/audits'))
 }
 
 export const statsApi = {

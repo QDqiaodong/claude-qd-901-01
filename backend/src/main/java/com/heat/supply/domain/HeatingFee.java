@@ -65,4 +65,16 @@ public class HeatingFee {
 
     @Column(name = "remark", length = 128)
     private String remark;
+
+    /** 待财务复核：同一年度两边都有实收时置 1，复核完成前禁止登记该年度缴费 */
+    @Column(name = "review_flag", nullable = false)
+    private boolean reviewFlag = false;
+
+    /** 归并作废：原重复档案台账行物理保留、金额冻结，不进台账/欠费统计 */
+    @Column(name = "voided", nullable = false)
+    private boolean voided = false;
+
+    /** 作废原因（含归并单号） */
+    @Column(name = "void_reason", length = 255)
+    private String voidReason;
 }

@@ -52,12 +52,20 @@
     <!-- ---------- 收费台账 ---------- -->
     <template v-else>
       <div class="hs-metrics">
-        <div class="hs-metric"><div class="label">台账笔数</div><div class="value">{{ fees.length }}</div></div>
-        <div class="hs-metric"><div class="label">应收合计</div><div class="value">{{ money(sum('receivable')) }}</div></div>
-        <div class="hs-metric"><div class="label">实收合计</div><div class="value">{{ money(sum('paid')) }}</div></div>
-        <div class="hs-metric danger"><div class="label">欠费合计</div><div class="value">{{ money(sum('arrears')) }}</div></div>
-        <div class="hs-metric warn"><div class="label">欠费户数</div><div class="value">{{ fees.filter((f) => Number(f.arrears) > 0).length }}</div></div>
+        <div class="hs-metric"><div class="label">台账笔数</div><div class="value">{{ activeFees.length }}</div></div>
+        <div class="hs-metric"><div class="label">应收合计</div><div class="value">{{ money(sumActive('receivable')) }}</div></div>
+        <div class="hs-metric"><div class="label">实收合计</div><div class="value">{{ money(sumActive('paid')) }}</div></div>
+        <div class="hs-metric danger"><div class="label">欠费合计</div><div class="value">{{ money(sumActive('arrears')) }}</div></div>
+        <div class="hs-metric warn"><div class="label">欠费户数</div><div class="value">{{ activeFees.filter((f) => Number(f.arrears) > 0).length }}</div></div>
+        <div class="hs-metric danger"><div class="label">待财务复核</div><div class="value">{{ fees.filter((f) => f.reviewFlag).length }}</div></div>
       </div>
+
+      <el-alert v-if="fees.some((f) => f.reviewFlag)" type="error" show-icon :closable="false" class="review-banner"
+                title="存在归并后待财务复核的收费记录：金额保留原始值，复核完成前禁止登记对应年度缴费。"
+        ><template #default>
+          <el-button size="small" type="danger" plain @click="goReview">前往财务复核</el-button>
+        </template>
+      </el-alert>
 
       <div class="hs-panel">
         <div class="hs-panel-title">
@@ -93,15 +101,28 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="lastPayDate" label="最近缴费日" width="110" />
-            <el-table-column label="行内缴费" width="210">
+            <el-table-column label="归并状态" width="120">
               <template #default="{ row }">
-                <div class="pay-cell">
+                <el-tag v-if="row.reviewFlag" size="small" type="danger" effect="dark">待财务复核</el-tag>
+                <el-tag v-else-if="row.voided" size="small" type="info">已作废冻结</el-tag>
+                <span v-else class="hs-muted">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="lastPayDate" label="最近缴费日" width="110" />
+            <el-table-column label="行内缴费" width="230">
+              <template #default="{ row }">
+                <div class="pay-cell" v-if="!row.voided && !row.reviewFlag">
                   <el-input-number v-model="payAmounts[row.id]" size="small" :precision="2" :step="100" :min="0"
                                    controls-position="right" style="width: 110px" />
                   <el-button size="small" type="primary" plain :disabled="Number(row.arrears) <= 0"
                              @click="pay(row)">登记</el-button>
                 </div>
+                <el-tooltip v-else-if="row.reviewFlag" content="待财务复核，复核完成前禁止登记该年度缴费" placement="top">
+                  <el-button size="small" type="danger" plain disabled>缴费冻结</el-button>
+                </el-tooltip>
+                <el-tooltip v-else :content="row.voidReason || '归并作废，金额冻结'" placement="top">
+                  <el-button size="small" plain disabled>已作废</el-button>
+                </el-tooltip>
               </template>
             </el-table-column>
           </el-table>
@@ -179,14 +200,19 @@ const grouped = computed(() => {
   return map
 })
 
+const activeFees = computed(() => fees.value.filter((f) => !f.voided))
+
 const residentOptions = computed(() =>
-  residents.value.map((r) => ({
-    id: r.id,
-    label: `${r.community} ${r.buildingNo}号楼${r.unitNo}单元${r.roomNo}　${r.meterNo}`
-  }))
+  residents.value
+    .filter((r) => !r.merged)
+    .map((r) => ({
+      id: r.id,
+      label: `${r.community} ${r.buildingNo}号楼${r.unitNo}单元${r.roomNo}　${r.meterNo}`
+    }))
 )
 
 function rowClass({ row }) {
+  if (row.voided) return 'hs-voided-row'
   return Number(row.arrears) > 0 ? 'hs-arrear-row' : ''
 }
 
@@ -213,6 +239,14 @@ function money(value) {
 
 function sum(field) {
   return fees.value.reduce((acc, cur) => acc + Number(cur[field] || 0), 0)
+}
+
+function sumActive(field) {
+  return activeFees.value.reduce((acc, cur) => acc + Number(cur[field] || 0), 0)
+}
+
+function goReview() {
+  window.location.hash = '#/merge?tab=review'
 }
 
 function onDragStart(order) {
@@ -410,5 +444,16 @@ onMounted(async () => {
 
 .arrear-text {
   color: var(--hs-danger);
+}
+
+.review-banner {
+  margin: 10px 0 0;
+  align-items: center;
+}
+
+:deep(.el-table .hs-voided-row td.el-table__cell) {
+  background: #f3f5f8;
+  color: var(--hs-muted);
+  text-decoration: line-through;
 }
 </style>

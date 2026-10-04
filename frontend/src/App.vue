@@ -93,7 +93,7 @@ const currentKey = computed(() => {
   const { path, query } = current.value
   if (path === '/stations') return 'source'
   if (path === '/network' || path === '/isolation') return 'pipe'
-  if (path === '/temperature') return 'resident'
+  if (path === '/temperature' || path === '/merge') return 'resident'
   if (path === '/service') return query.tab === 'fees' ? 'fee' : 'order'
   return 'source'
 })

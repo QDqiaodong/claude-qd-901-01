@@ -19,6 +19,8 @@ DROP TABLE IF EXISTS isolation_plan;
 DROP TABLE IF EXISTS heating_fee;
 DROP TABLE IF EXISTS repair_order;
 DROP TABLE IF EXISTS room_temp_sample;
+DROP TABLE IF EXISTS resident_alias;
+DROP TABLE IF EXISTS resident_merge_audit;
 DROP TABLE IF EXISTS resident;
 DROP TABLE IF EXISTS valve_well;
 DROP TABLE IF EXISTS pipe_segment;
@@ -98,6 +100,8 @@ CREATE TABLE valve_well (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ---------------- 热用户 ----------------
+-- meter_no 故意不再建 UNIQUE：业务上确实存在重复建档（同一热表录成两档），
+-- 重复档案只能经「归并」收口；归并前由后端保证在档用户的热表号不重复。
 CREATE TABLE resident (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     community VARCHAR(64) COMMENT '小区',
@@ -105,13 +109,19 @@ CREATE TABLE resident (
     unit_no VARCHAR(32) COMMENT '单元',
     room_no VARCHAR(32) COMMENT '房号',
     area_m2 DECIMAL(8, 2) COMMENT '建筑面积 ㎡',
-    meter_no VARCHAR(32) UNIQUE COMMENT '热表编号',
+    meter_no VARCHAR(32) COMMENT '热表编号',
     total_heat_gj DECIMAL(10, 2) COMMENT '累计用热量 GJ',
     station_id BIGINT,
     supply_status VARCHAR(16) COMMENT '正常供热 / 已报停',
     contact_phone VARCHAR(24),
+    merged TINYINT(1) NOT NULL DEFAULT 0 COMMENT '归并只读标记：1=已归并的重复档案，禁止一切业务登记',
+    merged_into_id BIGINT COMMENT '归并后保留档案 id（跳转落点）',
+    merged_at DATETIME COMMENT '归并确认时间',
+    merge_no VARCHAR(32) COMMENT '归并单号 GB-yyyyMMdd-序号',
     KEY idx_resident_station (station_id),
-    CONSTRAINT fk_resident_station FOREIGN KEY (station_id) REFERENCES heat_station (id)
+    KEY idx_resident_merged_into (merged_into_id),
+    CONSTRAINT fk_resident_station FOREIGN KEY (station_id) REFERENCES heat_station (id),
+    CONSTRAINT fk_resident_merged_into FOREIGN KEY (merged_into_id) REFERENCES resident (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ---------------- 室温抽测 ----------------
@@ -159,8 +169,50 @@ CREATE TABLE heating_fee (
     pay_status VARCHAR(16) COMMENT '已缴 / 部分 / 欠费',
     last_pay_date DATE,
     remark VARCHAR(128),
+    review_flag TINYINT(1) NOT NULL DEFAULT 0 COMMENT '待财务复核：同年度两边均有实收时置 1，复核前禁止登记该年度缴费',
+    voided TINYINT(1) NOT NULL DEFAULT 0 COMMENT '归并作废：原重复档案的台账行物理保留、金额冻结，不进台账/欠费统计',
+    void_reason VARCHAR(255) COMMENT '作废原因（含归并单号）',
     KEY idx_fee_resident (resident_id),
+    KEY idx_fee_review (review_flag),
     CONSTRAINT fk_fee_resident FOREIGN KEY (resident_id) REFERENCES resident (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ---------------- 热用户归并审计 ----------------
+-- 一次归并一行；写审计失败整笔事务回退，刷新后仍是归并前状态。
+CREATE TABLE resident_merge_audit (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    merge_no VARCHAR(32) NOT NULL UNIQUE COMMENT '归并单号 GB-yyyyMMdd-序号',
+    keeper_id BIGINT NOT NULL COMMENT '保留档案 id',
+    merged_id BIGINT NOT NULL COMMENT '待归并（重复）档案 id',
+    keeper_snapshot VARCHAR(255) COMMENT '保留档案地址 + 热表号快照',
+    merged_snapshot VARCHAR(255) COMMENT '重复档案地址 + 热表号快照',
+    chosen_supply_status VARCHAR(16) COMMENT '归并后采用的供热状态：正常供热 / 已报停',
+    sample_moved_count INT DEFAULT 0 COMMENT '改挂的室温抽测条数',
+    order_moved_count INT DEFAULT 0 COMMENT '改挂的报修工单条数',
+    fee_moved_count INT DEFAULT 0 COMMENT '改挂（含作废/标复核）的收费记录条数',
+    fee_recompute_year VARCHAR(64) COMMENT '两边均未缴费、按保留档案计费面积重算的年度清单',
+    fee_review_year VARCHAR(64) COMMENT '任一方已有实收、标待财务复核的年度清单',
+    details_json TEXT COMMENT '逐类引用迁移 / 收费处置明细 JSON',
+    operator VARCHAR(32) COMMENT '经办人',
+    created_at DATETIME,
+    KEY idx_audit_keeper (keeper_id),
+    KEY idx_audit_merged (merged_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- ---------------- 旧标识 → 保留档案 别名表 ----------------
+-- 归并后按地址、热表号、旧档案编号查询都只能落到同一户（保留档案）。
+CREATE TABLE resident_alias (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    alias_type VARCHAR(16) NOT NULL COMMENT 'METER_NO / OLD_ID / ADDRESS',
+    alias_value VARCHAR(160) NOT NULL COMMENT '旧标识值（地址为归一化全址）',
+    resident_id BIGINT NOT NULL COMMENT '落点：保留档案 id',
+    source_resident_id BIGINT NOT NULL COMMENT '该标识原属的重复档案 id',
+    merge_no VARCHAR(32) NOT NULL,
+    created_at DATETIME,
+    UNIQUE KEY uk_alias_type_value (alias_type, alias_value),
+    KEY idx_alias_resident (resident_id),
+    CONSTRAINT fk_alias_resident FOREIGN KEY (resident_id) REFERENCES resident (id),
+    CONSTRAINT fk_alias_source FOREIGN KEY (source_resident_id) REFERENCES resident (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ---------------- 管网隔离方案 ----------------
@@ -280,7 +332,7 @@ INSERT INTO valve_well (id, well_no, well_location, valve_caliber_dn, open_state
     (12, 'J112', '东环路南匝道绿化岛',       500, '关闭',   '正常',   11, '2026-02-11', '北环联络阀，保供时必须开启',    560, 240, 0, 0),
     (13, 'J114', '南环路抢修占道区',         500, '半开',   '检修中', 12, '2026-02-20', '井室被占压，现场无法操作',      520, 270, 1, 0);
 
--- 热用户 15 户（朝阳里小区 3 栋 × 4 单元构成 12 格矩阵）
+-- 热用户 20 户（朝阳里小区 3 栋 × 4 单元构成 12 格矩阵；16/17 为两套待归并重复建档，18/19/20 为对照样本）
 INSERT INTO resident (id, community, building_no, unit_no, room_no, area_m2, meter_no, total_heat_gj,
                       station_id, supply_status, contact_phone) VALUES
     (1,  '朝阳里小区', '1', '1', '101', 89.60,  'RB20260001', 42.35, 1, '正常供热', '13805310001'),
@@ -297,9 +349,21 @@ INSERT INTO resident (id, community, building_no, unit_no, room_no, area_m2, met
     (12, '朝阳里小区', '3', '4', '201', 99.20,  'RB20260012', 48.77, 2, '正常供热', '13805310012'),
     (13, '滨河家园',   '5', '1', '301', 88.00,  'RB20260013', 41.20, 3, '正常供热', '13805310013'),
     (14, '滨河家园',   '5', '1', '401', 71.60,  'RB20260014', 34.55, 3, '正常供热', '13805310014'),
-    (15, '滨河家园',   '6', '1', '302', 108.40, 'RB20260015', 52.31, 3, '已报停',   '13805310015');
+    (15, '滨河家园',   '6', '1', '302', 108.40, 'RB20260015', 52.31, 3, '已报停',   '13805310015'),
+    -- 待归并重复档 16：与档案 1 同址、同表、同站（1-1-101 / RB20260001 / HS-01），但供热状态不一致（1 正常 / 16 报停）；
+    -- 2025 年度两边都有实收（金额不同，归并时保留原始金额并标待财务复核）。
+    (16, '朝阳里小区', '1', '1', '101', 89.60,  'RB20260001', 42.30, 1, '已报停',   '13905310016'),
+    -- 待归并重复档 17：与档案 6 同址、同表、同站（2-2-102 / RB20260006 / HS-01），状态一致；
+    -- 2026 年度两边都未发生缴费（计费面积不一致），归并时按保留档案 6 的计费面积 130 ㎡重算，17 的台账行作废。
+    (17, '朝阳里小区', '2', '2', '102', 126.50, 'RB20260006', 61.40, 1, '正常供热', '13805310017'),
+    -- 对照样本 18：与档案 3 同址但热表号不同（RB20269999 ≠ RB20260003），预检必须终止归并
+    (18, '朝阳里小区', '1', '3', '101', 112.50, 'RB20269999', 55.62, 1, '正常供热', '13805310018'),
+    -- 对照样本 19：与档案 4 同址同表但所属换热站不同（HS-02 ≠ HS-01），预检必须终止归并
+    (19, '朝阳里小区', '1', '4', '101', 76.20,  'RB20260004', 37.90, 2, '正常供热', '13805310019'),
+    -- 对照样本 20：房号不同（202 ≠ 102），不是同一住房，不构成重复档案
+    (20, '朝阳里小区', '2', '1', '202', 94.80,  'RB20260021', 46.12, 1, '正常供热', '13805310020');
 
--- 室温抽测 15 条（含低于 18℃ 的不达标记录与高于 22℃ 的过热记录）
+-- 室温抽测 17 条（含低于 18℃ 的不达标记录与高于 22℃ 的过热记录；16/17 条挂在重复档案下，归并后应改挂保留档案）
 INSERT INTO room_temp_sample (id, resident_id, sample_date, temperature, qualified, household_name, surveyor, remark) VALUES
     (1,  1,  '2026-02-05', 21.4, 1, '张建平', '刘敏', NULL),
     (2,  1,  '2026-01-22', 20.8, 1, '张建平', '刘敏', NULL),
@@ -315,9 +379,11 @@ INSERT INTO room_temp_sample (id, resident_id, sample_date, temperature, qualifi
     (12, 9,  '2026-02-05', 19.0, 1, '吴德明', '吴国庆', NULL),
     (13, 10, '2026-02-05', 21.8, 1, '郑丽华', '吴国庆', NULL),
     (14, 11, '2026-02-05', 18.4, 1, '马春生', '郑立群', NULL),
-    (15, 12, '2026-02-05', 17.9, 0, '胡永康', '郑立群', '入户过滤器堵塞待清');
+    (15, 12, '2026-02-05', 17.9, 0, '胡永康', '郑立群', '入户过滤器堵塞待清'),
+    (16, 16, '2025-12-18', 20.5, 1, '张建平', '刘敏', '报停前入户抽测，归并后改挂保留档案'),
+    (17, 17, '2026-01-20', 18.6, 1, '赵秀英', '刘敏', '重复建档下的抽测，归并后改挂保留档案');
 
--- 报修工单 9 条（待派工 / 处理中 / 已闭环 各若干，HS-01 留有未闭环工单）
+-- 报修工单 11 条（待派工 / 处理中 / 已闭环 各若干，HS-01 留有未闭环工单；10/11 挂在重复档案下，归并后应改挂保留档案）
 INSERT INTO repair_order (id, order_no, reported_date, station_id, resident_id, fault_type, assignee,
                           handle_result, order_status, closed_date) VALUES
     (1, 'BX20260202001', '2026-02-02', 1, NULL, '漏水', '',       '',                                 '待派工', NULL),
@@ -328,9 +394,12 @@ INSERT INTO repair_order (id, order_no, reported_date, station_id, resident_id, 
     (6, 'BX20260210001', '2026-02-10', 3, 11,   '气堵', '孙鹏',   '顶层排气阀放气后恢复',             '已闭环', '2026-02-11'),
     (7, 'BX20260212001', '2026-02-12', 4, NULL, '异响', '牟继伟', '',                                 '待派工', NULL),
     (8, 'BX20260215001', '2026-02-15', 7, 13,   '不热', '赵立春', '清洗除污器，二次侧流量回升',       '已闭环', '2026-02-16'),
-    (9, 'BX20260218001', '2026-02-18', 7, 14,   '不热', '',       '',                                 '待派工', NULL);
+    (9, 'BX20260218001', '2026-02-18', 7, 14,   '不热', '',       '',                                 '待派工', NULL),
+    (10, 'BX20251220001', '2025-12-20', 1, 16,  '漏水', '牟继伟', '更换入户支管密封圈，渗漏消除',     '已闭环', '2025-12-21'),
+    (11, 'BX20260122001', '2026-01-22', 1, 17,  '不热', '赵立春', '',                                 '处理中', NULL);
 
--- 采暖费收缴 12 条（2026 收费年度，含已缴 / 部分 / 欠费）
+-- 采暖费收缴 15 条（2026 收费年度含已缴 / 部分 / 欠费；13/14 为 2025 年度同址两档的实收记录，
+-- 15 为重复档案 17 的 2026 欠费记录，与保留档案 6 的记录一起用于归并预检/处置演示）
 INSERT INTO heating_fee (id, fee_year, resident_id, billing_area, unit_price, receivable, paid, arrears,
                          pay_status, last_pay_date, remark) VALUES
     (1,  2026, 1,  89.60,  25.40, 2275.84, 2275.84,    0.00, '已缴', '2026-01-12', NULL),
@@ -344,4 +413,7 @@ INSERT INTO heating_fee (id, fee_year, resident_id, billing_area, unit_price, re
     (9,  2026, 9,  77.30,  25.40, 1963.42, 1500.00,  463.42, '部分', '2026-02-09', NULL),
     (10, 2026, 10, 120.00, 25.40, 3048.00,    0.00, 3048.00, '欠费', NULL,         '产权纠纷待核实'),
     (11, 2026, 11, 65.00,  25.40, 1651.00, 1651.00,    0.00, '已缴', '2026-01-20', NULL),
-    (12, 2026, 12, 99.20,  25.40, 2519.68, 2519.68,    0.00, '已缴', '2026-01-27', NULL);
+    (12, 2026, 12, 99.20,  25.40, 2519.68, 2519.68,    0.00, '已缴', '2026-01-27', NULL),
+    (13, 2025, 1,  89.60,  25.40, 2275.84, 2275.84,    0.00, '已缴', '2025-12-10', '上一采暖季已结清'),
+    (14, 2025, 16, 89.60,  25.40, 2275.84, 1000.00, 1275.84, '部分', '2025-12-25', '重复建档下又收了一次，归并后待财务复核'),
+    (15, 2026, 17, 126.50, 25.40, 3213.10,    0.00, 3213.10, '欠费', NULL,         '重复建档按错误面积计费，归并时作废并按保留档案重算');

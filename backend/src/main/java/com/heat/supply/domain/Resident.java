@@ -1,6 +1,7 @@
 package com.heat.supply.domain;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,8 +51,11 @@ public class Resident {
     @Column(name = "area_m2", precision = 8, scale = 2)
     private BigDecimal areaM2;
 
-    /** 热表编号 */
-    @Column(name = "meter_no", unique = true, length = 32)
+    /**
+     * 热表编号：业务上允许出现重复建档（同一热表录成两档），故这里不再加唯一约束，
+     * 由归并预检/后端服务保证在档用户的热表号不重复。
+     */
+    @Column(name = "meter_no", length = 32)
     private String meterNo;
 
     /** 累计用热量（GJ） */
@@ -69,6 +73,28 @@ public class Resident {
     @Column(name = "contact_phone", length = 24)
     private String contactPhone;
 
+    /** 是否已归并（只读重复档案）：归并后该档案禁止一切业务登记 */
+    @Column(name = "merged", nullable = false)
+    private boolean merged = false;
+
+    /** 归并落点：保留档案 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "merged_into_id")
+    private Resident mergedInto;
+
+    /** 归并确认时间 */
+    @Column(name = "merged_at")
+    private LocalDateTime mergedAt;
+
+    /** 归并单号 GB-yyyyMMdd-序号 */
+    @Column(name = "merge_no", length = 32)
+    private String mergeNo;
+
     @OneToMany(mappedBy = "resident", fetch = FetchType.LAZY)
     private List<RoomTempSample> samples = new ArrayList<>();
+
+    /** 归并只读判断 */
+    public boolean isMergedProfile() {
+        return merged;
+    }
 }

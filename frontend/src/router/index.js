@@ -8,13 +8,15 @@ import PipeNetworkView from '../views/PipeNetworkView.vue'
 import RoomTempView from '../views/RoomTempView.vue'
 import OrderFeeView from '../views/OrderFeeView.vue'
 import IsolationView from '../views/IsolationView.vue'
+import ResidentMergeView from '../views/ResidentMergeView.vue'
 
 export const routes = [
   { path: '/stations', view: StationLoadView, title: '换热站负载环阵列' },
   { path: '/network', view: PipeNetworkView, title: '管网平面示意图' },
   { path: '/isolation', view: IsolationView, title: '管网隔离方案' },
   { path: '/temperature', view: RoomTempView, title: '室温抽测热力格' },
-  { path: '/service', view: OrderFeeView, title: '报修工单与收费台账' }
+  { path: '/service', view: OrderFeeView, title: '报修工单与收费台账' },
+  { path: '/merge', view: ResidentMergeView, title: '重复热用户档案归并' }
 ]
 
 /** 五个模块的阀门节点 / 子功能项 */
@@ -44,7 +46,8 @@ export const navNodes = [
     desc: '用户 → 室温',
     children: [
       { label: '室温抽测热力格', hash: '#/temperature', tab: 'grid' },
-      { label: '用户档案与报停', hash: '#/temperature?tab=residents', tab: 'residents' }
+      { label: '用户档案与报停', hash: '#/temperature?tab=residents', tab: 'residents' },
+      { label: '重复热用户档案归并', hash: '#/merge', tab: 'merge' }
     ]
   },
   {

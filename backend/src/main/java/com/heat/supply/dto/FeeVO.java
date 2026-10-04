@@ -28,11 +28,17 @@ public class FeeVO {
     private String payStatus;
     private LocalDate lastPayDate;
     private String remark;
+    /** 待财务复核（同年度两边均有实收，复核前禁止登记缴费） */
+    private boolean reviewFlag;
+    /** 归并作废（金额冻结，不进台账/欠费统计） */
+    private boolean voided;
+    private String voidReason;
 
     public FeeVO(Long id, Integer feeYear, Long residentId, String community, String buildingNo, String unitNo,
                  String roomNo, String stationCode, String supplyStatus, BigDecimal billingArea,
                  BigDecimal unitPrice, BigDecimal receivable, BigDecimal paid, BigDecimal arrears,
-                 String payStatus, LocalDate lastPayDate, String remark) {
+                 String payStatus, LocalDate lastPayDate, String remark,
+                 boolean reviewFlag, boolean voided, String voidReason) {
         this.id = id;
         this.feeYear = feeYear;
         this.residentId = residentId;
@@ -50,5 +56,8 @@ public class FeeVO {
         this.payStatus = payStatus;
         this.lastPayDate = lastPayDate;
         this.remark = remark;
+        this.reviewFlag = reviewFlag;
+        this.voided = voided;
+        this.voidReason = voidReason;
     }
 }

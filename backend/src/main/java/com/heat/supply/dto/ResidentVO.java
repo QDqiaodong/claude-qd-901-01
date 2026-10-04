@@ -24,11 +24,17 @@ public class ResidentVO {
     private String supplyStatus;
     private String contactPhone;
     private BigDecimal arrears;
+    /** 归并只读标记 */
+    private boolean merged;
+    /** 归并后跳转的保留档案 id */
+    private Long mergedIntoId;
+    /** 归并单号 */
+    private String mergeNo;
 
     public ResidentVO(Long id, String community, String buildingNo, String unitNo, String roomNo,
                       BigDecimal areaM2, String meterNo, BigDecimal totalHeatGj, Long stationId,
                       String stationCode, String stationName, String supplyStatus, String contactPhone,
-                      BigDecimal arrears) {
+                      BigDecimal arrears, boolean merged, Long mergedIntoId, String mergeNo) {
         this.id = id;
         this.community = community;
         this.buildingNo = buildingNo;
@@ -43,5 +49,8 @@ public class ResidentVO {
         this.supplyStatus = supplyStatus;
         this.contactPhone = contactPhone;
         this.arrears = arrears;
+        this.merged = merged;
+        this.mergedIntoId = mergedIntoId;
+        this.mergeNo = mergeNo;
     }
 }

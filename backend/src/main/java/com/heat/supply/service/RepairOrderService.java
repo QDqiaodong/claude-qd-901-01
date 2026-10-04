@@ -73,6 +73,11 @@ public class RepairOrderService {
                 ? null
                 : residentRepository.findById(request.getResidentId())
                         .orElseThrow(() -> new BizException("热用户不存在：id=" + request.getResidentId()));
+        if (resident != null && resident.isMerged()) {
+            throw new BizException("档案 " + resident.getId() + " 已归并（归并单 " + resident.getMergeNo()
+                    + "），为只读档案，不能新建工单；请到保留档案 "
+                    + resident.getMergedInto().getId() + " 办理");
+        }
         if (station == null && resident != null) {
             station = resident.getStation();
         }
@@ -113,6 +118,10 @@ public class RepairOrderService {
         Resident resident = sample.getResident();
         if (resident == null) {
             throw new BizException("该室温抽测缺少关联热用户，无法生成工单");
+        }
+        if (resident.isMerged()) {
+            throw new BizException("该抽测记录挂在已归并只读档案下（归并单 " + resident.getMergeNo()
+                    + "），请到保留档案办理报修");
         }
         long duplicate = repairOrderRepository.countDuplicate(resident.getId(), Dict.FAULT_FROM_TEMP, "已闭环");
         if (duplicate > 0) {

@@ -68,10 +68,13 @@ public class MonitorController {
         return ApiResponse.success(monitorService.createOrderFromSample(id));
     }
 
+    /** 在档热用户档案（默认不含已归并只读档案；归并页可传 includeMerged=true 带出） */
     @GetMapping("/residents")
     public ApiResponse<List<ResidentVO>> residents(@RequestParam(required = false) Long stationId,
-                                                   @RequestParam(required = false) String community) {
-        return ApiResponse.success(monitorService.listResidents(stationId, community));
+                                                   @RequestParam(required = false) String community,
+                                                   @RequestParam(required = false, defaultValue = "false")
+                                                   boolean includeMerged) {
+        return ApiResponse.success(monitorService.listResidents(stationId, community, includeMerged));
     }
 
     @GetMapping("/residents/communities")

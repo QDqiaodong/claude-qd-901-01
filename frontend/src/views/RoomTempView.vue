@@ -91,12 +91,18 @@
 
     <template v-else>
       <div class="hs-panel">
-        <div class="hs-panel-title">用户档案（欠费用户不允许办理报停 / 恢复）</div>
+        <div class="hs-panel-title">
+          用户档案（欠费用户不允许办理报停 / 恢复；已归并档案只读，可跳转保留档案）
+        </div>
         <div class="hs-panel-body">
-          <el-table :data="residents" border size="small" height="520">
+          <el-table :data="residents" border size="small" height="520"
+                    :row-class-name="residentRowClass">
             <el-table-column label="用户" min-width="180">
               <template #default="{ row }">
                 {{ row.community }} {{ row.buildingNo }}号楼{{ row.unitNo }}单元{{ row.roomNo }}
+                <el-tag v-if="row.merged" size="small" type="info" effect="plain" style="margin-left: 4px">
+                  已归并只读
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="areaM2" label="面积 ㎡" width="90" align="right" />
@@ -116,11 +122,15 @@
                 <span :class="{ 'arrear-text': Number(row.arrears) > 0 }">{{ fmtMoney(row.arrears) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150">
+            <el-table-column label="操作" width="200">
               <template #default="{ row }">
-                <el-button size="small" :type="row.supplyStatus === '正常供热' ? 'warning' : 'success'" plain
+                <el-button v-if="!row.merged" size="small"
+                           :type="row.supplyStatus === '正常供热' ? 'warning' : 'success'" plain
                            @click="toggleSupply(row)">
                   {{ row.supplyStatus === '正常供热' ? '报停' : '恢复' }}
+                </el-button>
+                <el-button v-else size="small" type="primary" plain @click="gotoMerged(row)">
+                  跳转保留档案 #{{ row.mergedIntoId }}
                 </el-button>
               </template>
             </el-table-column>
@@ -293,6 +303,15 @@ async function toggleSupply(row) {
   }
 }
 
+/** 已归并只读档案：跳转到归并页并用旧档案编号落档查询 */
+function gotoMerged(row) {
+  window.location.hash = `#/merge?jump=${encodeURIComponent(row.id)}`
+}
+
+function residentRowClass({ row }) {
+  return row.merged ? 'merged-row' : ''
+}
+
 async function loadGrid() {
   try {
     grid.value = await monitorApi.grid(community.value)
@@ -312,7 +331,7 @@ async function loadStat() {
 
 async function loadResidents() {
   try {
-    residents.value = await monitorApi.residents(null, null)
+    residents.value = await monitorApi.residents(null, null, true)
   } catch (e) {
     residents.value = []
   }
@@ -460,5 +479,10 @@ onMounted(async () => {
 .arrear-text {
   color: var(--hs-danger);
   font-weight: 600;
+}
+
+:deep(.el-table .merged-row td.el-table__cell) {
+  background: #f3f5f8;
+  color: var(--hs-muted);
 }
 </style>

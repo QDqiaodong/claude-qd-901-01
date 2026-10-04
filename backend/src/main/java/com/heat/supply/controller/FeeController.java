@@ -15,12 +15,15 @@ import org.springframework.web.bind.annotation.RestController;
 import com.heat.supply.common.ApiResponse;
 import com.heat.supply.common.Dict;
 import com.heat.supply.dto.ArrearsRankDTO;
+import com.heat.supply.dto.FeeReviewResolveRequest;
 import com.heat.supply.dto.FeeVO;
 import com.heat.supply.dto.PayRequest;
 import com.heat.supply.service.FeeService;
 
+import jakarta.validation.Valid;
+
 /**
- * 模块 5：采暖费收缴台账（欠费降序排序 + 行内登记缴费）。
+ * 模块 5：采暖费收缴台账（欠费降序排序 + 行内登记缴费 + 归并待财务复核）。
  */
 @RestController
 @RequestMapping("/api/fees")
@@ -32,9 +35,12 @@ public class FeeController {
         this.feeService = feeService;
     }
 
+    /** 收费台账：默认隐藏归并作废行，includeVoided=true 可一并查看（置灰只读） */
     @GetMapping
-    public ApiResponse<List<FeeVO>> list(@RequestParam(required = false) Integer year) {
-        return ApiResponse.success(feeService.listFees(year));
+    public ApiResponse<List<FeeVO>> list(@RequestParam(required = false) Integer year,
+                                         @RequestParam(required = false, defaultValue = "false")
+                                         boolean includeVoided) {
+        return ApiResponse.success(feeService.listFees(year, includeVoided));
     }
 
     /** 手写 JPQL + Redis 缓存：欠费金额排行 */
@@ -55,10 +61,23 @@ public class FeeController {
         return ApiResponse.success(data);
     }
 
-    /** 行内登记缴费（超额 / 负数会报错） */
+    /** 行内登记缴费（超额 / 负数 / 待复核 / 已作废 / 只读归并档案都会报错） */
     @PostMapping("/{id}/pay")
     public ApiResponse<FeeVO> pay(@PathVariable Long id, @RequestBody PayRequest request) {
         return ApiResponse.success(feeService.pay(id, request));
+    }
+
+    /** 财务复核台账：归并后同年度双份实收、待财务复核的台账行 */
+    @GetMapping("/reviews")
+    public ApiResponse<List<FeeVO>> reviews() {
+        return ApiResponse.success(feeService.listReviewFees());
+    }
+
+    /** 财务复核完成：两条台账收口为一条，重复行作废冻结，随后恢复该年度缴费登记 */
+    @PostMapping("/reviews/resolve")
+    public ApiResponse<FeeVO> resolveReview(@Valid @RequestBody FeeReviewResolveRequest request) {
+        return ApiResponse.success("财务复核已完成，重复台账已作废冻结，该年度恢复缴费登记",
+                feeService.resolveReview(request));
     }
 
     @GetMapping("/dict")
