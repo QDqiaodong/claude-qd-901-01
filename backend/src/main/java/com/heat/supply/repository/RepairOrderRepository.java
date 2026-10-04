@@ -27,6 +27,9 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, Long> 
     long countDuplicate(@Param("residentId") Long residentId, @Param("faultType") String faultType,
                         @Param("closed") String closed);
 
+    /** 归并：按原 id 顺序取出待归并档案关联的全部报修记录，逐条改挂，工单号/时间/处理结果不变 */
+    List<RepairOrder> findByResidentIdOrderByIdAsc(Long residentId);
+
     List<RepairOrder> findByReportedDateBetweenOrderByReportedDateDesc(LocalDate from, LocalDate to);
 
     long countByReportedDate(LocalDate reportedDate);

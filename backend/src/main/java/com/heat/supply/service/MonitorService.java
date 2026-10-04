@@ -102,6 +102,10 @@ public class MonitorService {
         }
         List<ResidentVO> result = new ArrayList<>();
         for (Resident resident : residents) {
+            // 归档（归并后只读）档案不出现在用户档案列表，统一从保留档案入口查看
+            if (resident.isArchived()) {
+                continue;
+            }
             result.add(toResidentVo(resident));
         }
         return result;
@@ -120,7 +124,8 @@ public class MonitorService {
         String target = (community == null || community.isBlank())
                 ? residentRepository.findAllCommunities().stream().findFirst().orElse("")
                 : community;
-        List<Resident> residents = residentRepository.findByCommunityOrderByBuildingNoAscUnitNoAscRoomNoAsc(target);
+        List<Resident> residents = residentRepository.findByCommunityOrderByBuildingNoAscUnitNoAscRoomNoAsc(target)
+                .stream().filter(r -> !r.isArchived()).toList();
 
         Map<Long, LatestTempDTO> latestMap = new HashMap<>();
         for (LatestTempDTO dto : sampleRepository.findLatestPerResident()) {
@@ -215,6 +220,11 @@ public class MonitorService {
     public RoomTempVO recordSample(RoomTempRequest request) {
         Resident resident = residentRepository.findById(request.getResidentId())
                 .orElseThrow(() -> new BizException("热用户不存在：id=" + request.getResidentId()));
+        if (resident.isArchived()) {
+            throw new BizException("该档案已归并归档（只读），请到保留档案 id="
+                    + (resident.getMergedInto() == null ? "" : resident.getMergedInto().getId())
+                    + " 录入室温抽测");
+        }
         BigDecimal temperature = request.getTemperature();
         if (temperature == null) {
             throw new BizException("请填写抽测室温（℃）");
@@ -268,6 +278,9 @@ public class MonitorService {
     public ResidentVO changeSupplyStatus(Long residentId, SupplyChangeRequest request) {
         Resident resident = residentRepository.findById(residentId)
                 .orElseThrow(() -> new BizException("热用户不存在：id=" + residentId));
+        if (resident.isArchived()) {
+            throw new BizException("该档案已归并归档（只读），供热状态请到保留档案办理");
+        }
         String target = request.getSupplyStatus();
         if (!Dict.isValidSupplyStatus(target)) {
             throw new BizException("供热状态只能是：正常供热 / 已报停");
@@ -315,7 +328,7 @@ public class MonitorService {
 
     private ResidentVO toResidentVo(Resident resident) {
         HeatStation station = resident.getStation();
-        return new ResidentVO(
+        ResidentVO vo = new ResidentVO(
                 resident.getId(),
                 resident.getCommunity(),
                 resident.getBuildingNo(),
@@ -330,6 +343,10 @@ public class MonitorService {
                 resident.getSupplyStatus(),
                 resident.getContactPhone(),
                 feeRepository.sumArrearsByResident(resident.getId()));
+        vo.setArchived(resident.isArchived());
+        vo.setMergedIntoId(resident.getMergedInto() == null ? null : resident.getMergedInto().getId());
+        vo.setLegacyCode(resident.getLegacyCode() == null ? "R" + resident.getId() : resident.getLegacyCode());
+        return vo;
     }
 
     private BigDecimal nvl(BigDecimal value) {

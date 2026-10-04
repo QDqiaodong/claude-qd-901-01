@@ -19,6 +19,14 @@ public interface HeatingFeeRepository extends JpaRepository<HeatingFee, Long> {
 
     Optional<HeatingFee> findByResidentIdAndFeeYear(Long residentId, Integer feeYear);
 
+    /** 同一年度是否还有未复核的台账（复核前禁止登记该年度缴费） */
+    @Query("select count(f.id) from HeatingFee f where f.resident.id = :residentId "
+            + "and f.feeYear = :feeYear and f.reviewRequired = true and f.reviewed = false")
+    long countPendingReview(@Param("residentId") Long residentId, @Param("feeYear") Integer feeYear);
+
+    /** 待财务复核台账 */
+    List<HeatingFee> findByReviewRequiredTrueAndReviewedFalseOrderByFeeYearDescIdAsc();
+
     /**
      * 手写 JPQL：欠费金额排行（只取仍有欠费的记录）。
      */

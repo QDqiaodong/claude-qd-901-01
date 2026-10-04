@@ -86,17 +86,25 @@
                 <b :class="{ 'arrear-text': Number(row.arrears) > 0 }">{{ money(row.arrears) }}</b>
               </template>
             </el-table-column>
-            <el-table-column label="缴费状态" width="100">
+            <el-table-column label="缴费状态" width="110">
               <template #default="{ row }">
                 <el-tag size="small" effect="light" :type="row.payStatus === '已缴' ? 'success' : row.payStatus === '部分' ? 'warning' : 'danger'">
                   {{ row.payStatus }}
                 </el-tag>
+                <el-tag v-if="row.reviewRequired && !row.reviewed" size="small" type="danger" effect="dark"
+                        style="margin-left: 2px">待财务复核</el-tag>
+                <el-tag v-else-if="row.reviewRequired && row.reviewed" size="small" type="success" effect="plain"
+                        style="margin-left: 2px">已复核</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="lastPayDate" label="最近缴费日" width="110" />
-            <el-table-column label="行内缴费" width="210">
+            <el-table-column label="行内缴费 / 复核" min-width="260">
               <template #default="{ row }">
-                <div class="pay-cell">
+                <div v-if="row.reviewRequired && !row.reviewed" class="pay-cell">
+                  <el-button size="small" type="danger" plain @click="review(row)">财务复核</el-button>
+                  <span class="hs-muted" style="font-size: 12px">复核前禁止登记 {{ row.feeYear }} 年度缴费</span>
+                </div>
+                <div v-else class="pay-cell">
                   <el-input-number v-model="payAmounts[row.id]" size="small" :precision="2" :step="100" :min="0"
                                    controls-position="right" style="width: 110px" />
                   <el-button size="small" type="primary" plain :disabled="Number(row.arrears) <= 0"
@@ -253,6 +261,10 @@ async function onDrop(target) {
 }
 
 async function pay(row) {
+  if (row.reviewRequired && !row.reviewed) {
+    ElMessage.error(`${row.feeYear} 年度台账待财务复核，复核完成前禁止登记缴费`)
+    return
+  }
   const amount = payAmounts[row.id]
   if (amount === undefined || amount === null) {
     ElMessage.warning('请先录入缴费金额')
@@ -262,6 +274,25 @@ async function pay(row) {
     await feeApi.pay(row.id, { amount })
     ElMessage.success(`已登记缴费 ${money(amount)} 元`)
     payAmounts[row.id] = undefined
+    await loadFees()
+  } catch (e) {
+    ElMessage.error(e.message)
+  }
+}
+
+async function review(row) {
+  let note = ''
+  try {
+    const r = await ElMessageBox.prompt(
+      `财务复核 ${row.feeYear} 年度归并台账：两边原始金额保留不动，复核后可继续登记该年度缴费。可填写复核备注：`,
+      '待财务复核', { inputValue: '', inputPlaceholder: '如：核对实收凭证无误' })
+    note = r.value || ''
+  } catch (e) {
+    return
+  }
+  try {
+    const touched = await feeApi.review(row.id, { note })
+    ElMessage.success(`已完成 ${touched.length} 条 ${row.feeYear} 年度台账复核，金额保持原值`)
     await loadFees()
   } catch (e) {
     ElMessage.error(e.message)

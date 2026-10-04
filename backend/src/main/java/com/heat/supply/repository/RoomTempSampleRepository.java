@@ -12,6 +12,9 @@ public interface RoomTempSampleRepository extends JpaRepository<RoomTempSample, 
 
     List<RoomTempSample> findByResidentIdOrderBySampleDateDesc(Long residentId);
 
+    /** 归并：按原 id 顺序取出待归并档案的全部抽测记录，逐条改挂，不改编号/时间/结果 */
+    List<RoomTempSample> findByResidentIdOrderByIdAsc(Long residentId);
+
     @Query("select v.id from RoomTempSample v order by v.sampleDate desc, v.id desc")
     List<Long> findIdsOrderBySampleDateDesc();
 

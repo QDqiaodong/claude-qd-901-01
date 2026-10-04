@@ -53,7 +53,16 @@ export const monitorApi = {
   communities: () => unwrap(http.get('/monitor/residents/communities')),
   changeSupply: (id, supplyStatus) =>
     unwrap(http.put(`/monitor/residents/${id}/supply-status`, { supplyStatus })),
-  dict: () => unwrap(http.get('/monitor/dict'))
+  dict: () => unwrap(http.get('/monitor/dict')),
+  /** 重复热用户档案归并 */
+  mergeCandidates: (residentId) =>
+    unwrap(http.get('/monitor/residents/merge/candidates', { params: { residentId } })),
+  mergePrecheck: (keptId, awayId) =>
+    unwrap(http.post('/monitor/residents/merge/precheck', null, { params: { keptId, awayId } })),
+  mergeConfirm: (payload) => unwrap(http.post('/monitor/residents/merge/confirm', payload)),
+  mergeLogs: () => unwrap(http.get('/monitor/residents/merge/logs')),
+  /** 按地址 / 热表号 / 旧档案编号查询落点（归档档案自动跳到保留档案，只能落到同一户） */
+  resolveResident: (params) => unwrap(http.get('/monitor/residents/resolve', { params }))
 }
 
 export const orderApi = {
@@ -68,7 +77,9 @@ export const feeApi = {
   list: (year) => unwrap(http.get('/fees', { params: { year } })),
   arrearsRank: () => unwrap(http.get('/fees/arrears-rank')),
   years: () => unwrap(http.get('/fees/years')),
-  pay: (id, payload) => unwrap(http.post(`/fees/${id}/pay`, payload))
+  pay: (id, payload) => unwrap(http.post(`/fees/${id}/pay`, payload)),
+  pendingReview: () => unwrap(http.get('/fees/pending-review')),
+  review: (id, payload) => unwrap(http.post(`/fees/${id}/review`, payload || {}))
 }
 
 export const statsApi = {

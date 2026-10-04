@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.heat.supply.common.ApiResponse;
 import com.heat.supply.common.Dict;
 import com.heat.supply.dto.ArrearsRankDTO;
+import com.heat.supply.dto.FeeReviewRequest;
 import com.heat.supply.dto.FeeVO;
 import com.heat.supply.dto.PayRequest;
 import com.heat.supply.service.FeeService;
@@ -55,10 +56,23 @@ public class FeeController {
         return ApiResponse.success(data);
     }
 
-    /** 行内登记缴费（超额 / 负数会报错） */
+    /** 行内登记缴费（超额 / 负数 / 待复核年度都会被拒绝） */
     @PostMapping("/{id}/pay")
     public ApiResponse<FeeVO> pay(@PathVariable Long id, @RequestBody PayRequest request) {
         return ApiResponse.success(feeService.pay(id, request));
+    }
+
+    /** 待财务复核台账清单（归并产生，复核前该年度禁止登记缴费） */
+    @GetMapping("/pending-review")
+    public ApiResponse<List<FeeVO>> pendingReview() {
+        return ApiResponse.success(feeService.listPendingReview());
+    }
+
+    /** 财务复核：同年度待复核台账成组放行，金额一律保留不动 */
+    @PostMapping("/{id}/review")
+    public ApiResponse<List<FeeVO>> review(@PathVariable Long id, @RequestBody(required = false) FeeReviewRequest request) {
+        String note = request == null ? null : request.getNote();
+        return ApiResponse.success("财务复核完成，原始金额保留，可继续登记该年度缴费", feeService.review(id, note));
     }
 
     @GetMapping("/dict")

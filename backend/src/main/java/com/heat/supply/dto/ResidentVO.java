@@ -24,6 +24,12 @@ public class ResidentVO {
     private String supplyStatus;
     private String contactPhone;
     private BigDecimal arrears;
+    /** 是否为归并后的只读归档档案 */
+    private Boolean archived;
+    /** 归档档案跳转到的保留档案 id */
+    private Long mergedIntoId;
+    /** 旧档案编号 */
+    private String legacyCode;
 
     public ResidentVO(Long id, String community, String buildingNo, String unitNo, String roomNo,
                       BigDecimal areaM2, String meterNo, BigDecimal totalHeatGj, Long stationId,

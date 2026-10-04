@@ -120,6 +120,23 @@ public final class Dict {
     /** 用户供热状态（报停 / 恢复） */
     public static final List<String> SUPPLY_STATUS = List.of("正常供热", "已报停");
 
+    // ---------------- 重复档案归并 ----------------
+    public static final String SUPPLY_ACTIVE = "正常供热";
+    public static final String SUPPLY_SUSPENDED = "已报停";
+
+    /** 归并单状态 */
+    public static final String MERGE_STATUS_DONE = "已归并";
+    public static final String MERGE_STATUS_FAILED = "失败回退";
+
+    /** 收费年度台账处置方式 */
+    public static final String FEE_ACTION_RECALC = "RECALC";
+    public static final String FEE_ACTION_KEEP_REVIEW = "KEEP_REVIEW";
+    public static final String FEE_ACTION_MIGRATE = "MIGRATE";
+
+    /** 归并重算台账备注前缀 / 待复核备注前缀 */
+    public static final String RECALC_REMARK_PREFIX = "档案归并重算：";
+    public static final String REVIEW_REMARK_PREFIX = "档案归并待财务复核：";
+
     /** 欠费零点阈值（元），小于等于该值视为已缴清 */
     public static final BigDecimal ARREARS_EPSILON = BigDecimal.valueOf(0.01);
 

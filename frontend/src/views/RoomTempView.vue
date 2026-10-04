@@ -18,6 +18,7 @@
     <el-tabs v-model="innerTab" class="hs-tabs">
       <el-tab-pane label="室温抽测热力格" name="grid" />
       <el-tab-pane label="用户档案与报停" name="residents" />
+      <el-tab-pane label="重复档案归并" name="merge" />
     </el-tabs>
 
     <template v-if="innerTab === 'grid'">
@@ -89,9 +90,9 @@
       </div>
     </template>
 
-    <template v-else>
+    <template v-else-if="innerTab === 'residents'">
       <div class="hs-panel">
-        <div class="hs-panel-title">用户档案（欠费用户不允许办理报停 / 恢复）</div>
+        <div class="hs-panel-title">用户档案（欠费用户不允许办理报停 / 恢复；归档档案已归并到保留档案，不在此展示）</div>
         <div class="hs-panel-body">
           <el-table :data="residents" border size="small" height="520">
             <el-table-column label="用户" min-width="180">
@@ -116,17 +117,23 @@
                 <span :class="{ 'arrear-text': Number(row.arrears) > 0 }">{{ fmtMoney(row.arrears) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150">
+            <el-table-column label="操作" width="190">
               <template #default="{ row }">
                 <el-button size="small" :type="row.supplyStatus === '正常供热' ? 'warning' : 'success'" plain
                            @click="toggleSupply(row)">
                   {{ row.supplyStatus === '正常供热' ? '报停' : '恢复' }}
                 </el-button>
+                <el-button size="small" type="primary" plain @click="gotoMerge(row)">归并</el-button>
               </template>
             </el-table-column>
           </el-table>
         </div>
       </div>
+    </template>
+
+    <template v-else-if="innerTab === 'merge'">
+      <ResidentMergePanel :key="mergePanelKey" :residents="residents" :initial-kept-id="mergeKeptId"
+                          @changed="loadResidents" />
     </template>
 
     <!-- 录入抽测 -->
@@ -171,12 +178,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { monitorApi } from '../api'
+import ResidentMergePanel from '../components/ResidentMergePanel.vue'
 
 const props = defineProps({ tab: { type: String, default: '' } })
 
-const innerTab = ref(props.tab === 'residents' ? 'residents' : 'grid')
+const innerTab = ref(props.tab === 'residents' ? 'residents' : props.tab === 'merge' ? 'merge' : 'grid')
 watch(() => props.tab, (v) => {
-  if (v === 'residents' || v === 'grid') innerTab.value = v
+  if (v === 'residents' || v === 'grid' || v === 'merge') innerTab.value = v
 })
 
 const grid = ref({ community: '', buildings: [], units: [], cells: [] })
@@ -184,6 +192,8 @@ const statRows = ref([])
 const communities = ref([])
 const community = ref('')
 const residents = ref([])
+const mergeKeptId = ref(null)
+const mergePanelKey = ref(0)
 
 const recordVisible = ref(false)
 const saving = ref(false)
@@ -291,6 +301,13 @@ async function toggleSupply(row) {
   } catch (e) {
     ElMessage.error(e.message)
   }
+}
+
+function gotoMerge(row) {
+  mergeKeptId.value = row.id
+  mergePanelKey.value++
+  innerTab.value = 'merge'
+  window.location.hash = '#/temperature?tab=merge'
 }
 
 async function loadGrid() {

@@ -102,12 +102,21 @@ public class FeeService {
     }
 
     /**
-     * 行内登记缴费：金额不得为负、不得超过欠费金额。
+     * 行内登记缴费：金额不得为负、不得超过欠费金额；
+     * 归并产生的同年度待财务复核台账，在复核完成前禁止登记缴费。
      */
     @Transactional
     public FeeVO pay(Long feeId, PayRequest request) {
         HeatingFee fee = feeRepository.findById(feeId)
                 .orElseThrow(() -> new BizException("收费记录不存在：id=" + feeId));
+        Resident resident = fee.getResident();
+        if (resident != null && resident.isArchived()) {
+            throw new BizException("该台账挂接的档案已归并归档（只读），请到保留档案下办理缴费");
+        }
+        long pending = feeRepository.countPendingReview(fee.getResident().getId(), fee.getFeeYear());
+        if (pending > 0) {
+            throw new BizException(fee.getFeeYear() + " 收费年度存在归并待财务复核台账，复核完成前禁止登记该年度缴费");
+        }
         BigDecimal amount = request.getAmount();
         if (amount == null) {
             throw new BizException("请填写缴费金额");
@@ -138,9 +147,52 @@ public class FeeService {
         return toVo(saved);
     }
 
+    /**
+     * 财务复核：同一收费年度（一个保留档案 + 归并并挂）的待复核台账成组复核。
+     * 仅放行/登记复核结论，不重算、不改动任何原始金额；复核完成后方可继续登记该年度缴费。
+     *
+     * @param feeId 该户该年度任一条待复核台账 id
+     * @param note  复核备注，可空
+     */
+    @Transactional
+    public List<FeeVO> review(Long feeId, String note) {
+        HeatingFee anchor = feeRepository.findById(feeId)
+                .orElseThrow(() -> new BizException("收费记录不存在：id=" + feeId));
+        if (!anchor.isReviewRequired() || anchor.isReviewed()) {
+            throw new BizException("该台账不是待财务复核记录或已复核完成");
+        }
+        List<HeatingFee> yearRows = feeRepository
+                .findByResidentIdOrderByFeeYearDesc(anchor.getResident().getId())
+                .stream().filter(f -> anchor.getFeeYear().equals(f.getFeeYear())).toList();
+        List<FeeVO> result = new ArrayList<>();
+        for (HeatingFee f : yearRows) {
+            if (f.isReviewRequired() && !f.isReviewed()) {
+                f.setReviewed(true);
+                String suffix = "财务已于 " + LocalDate.now() + " 复核，金额保留确认"
+                        + (note == null || note.isBlank() ? "" : "：" + note.trim());
+                String remark = f.getRemark() == null || f.getRemark().isBlank()
+                        ? suffix : f.getRemark() + "；" + suffix;
+                f.setRemark(remark.length() > 128 ? remark.substring(0, 128) : remark);
+                result.add(toVo(feeRepository.save(f)));
+            }
+        }
+        redisTemplate.delete(Dict.CACHE_ARREARS_RANK);
+        redisTemplate.delete(Dict.CACHE_OVERVIEW);
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<FeeVO> listPendingReview() {
+        List<FeeVO> result = new ArrayList<>();
+        for (HeatingFee fee : feeRepository.findByReviewRequiredTrueAndReviewedFalseOrderByFeeYearDescIdAsc()) {
+            result.add(toVo(fee));
+        }
+        return result;
+    }
+
     private FeeVO toVo(HeatingFee fee) {
         Resident resident = fee.getResident();
-        return new FeeVO(
+        FeeVO vo = new FeeVO(
                 fee.getId(),
                 fee.getFeeYear(),
                 resident == null ? null : resident.getId(),
@@ -158,6 +210,10 @@ public class FeeService {
                 fee.getPayStatus(),
                 fee.getLastPayDate(),
                 fee.getRemark());
+        vo.setReviewRequired(fee.isReviewRequired());
+        vo.setReviewed(fee.isReviewed());
+        vo.setMergeYearDup(fee.isMergeYearDup());
+        return vo;
     }
 
     private BigDecimal nvl(BigDecimal value) {

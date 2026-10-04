@@ -44,7 +44,8 @@ export const navNodes = [
     desc: '用户 → 室温',
     children: [
       { label: '室温抽测热力格', hash: '#/temperature', tab: 'grid' },
-      { label: '用户档案与报停', hash: '#/temperature?tab=residents', tab: 'residents' }
+      { label: '用户档案与报停', hash: '#/temperature?tab=residents', tab: 'residents' },
+      { label: '重复档案归并', hash: '#/temperature?tab=merge', tab: 'merge' }
     ]
   },
   {

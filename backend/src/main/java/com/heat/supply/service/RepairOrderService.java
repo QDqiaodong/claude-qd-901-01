@@ -73,6 +73,10 @@ public class RepairOrderService {
                 ? null
                 : residentRepository.findById(request.getResidentId())
                         .orElseThrow(() -> new BizException("热用户不存在：id=" + request.getResidentId()));
+        if (resident != null && resident.isArchived()) {
+            throw new BizException("该档案已归并归档（只读），报修工单请到保留档案 id="
+                    + (resident.getMergedInto() == null ? "" : resident.getMergedInto().getId()) + " 登记");
+        }
         if (station == null && resident != null) {
             station = resident.getStation();
         }

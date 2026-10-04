@@ -28,6 +28,12 @@ public class FeeVO {
     private String payStatus;
     private LocalDate lastPayDate;
     private String remark;
+    /** 待财务复核（同年度两边记录且任一方已有实收） */
+    private Boolean reviewRequired;
+    /** 财务是否已复核（未复核禁止登记缴费） */
+    private Boolean reviewed;
+    /** 归并产生的同年度并挂记录 */
+    private Boolean mergeYearDup;
 
     public FeeVO(Long id, Integer feeYear, Long residentId, String community, String buildingNo, String unitNo,
                  String roomNo, String stationCode, String supplyStatus, BigDecimal billingArea,

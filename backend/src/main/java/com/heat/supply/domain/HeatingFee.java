@@ -65,4 +65,20 @@ public class HeatingFee {
 
     @Column(name = "remark", length = 128)
     private String remark;
+
+    /** 待财务复核：同一收费年度两边都有记录且任一方已有实收时置位 */
+    @Column(name = "review_required", nullable = false)
+    private boolean reviewRequired = false;
+
+    /** 财务是否已复核：未复核前禁止登记该年度缴费 */
+    @Column(name = "reviewed", nullable = false)
+    private boolean reviewed = false;
+
+    /** 归并产生的同年度并挂记录（原待归并档案台账，金额原样保留） */
+    @Column(name = "merge_year_dup", nullable = false)
+    private boolean mergeYearDup = false;
+
+    /** 由哪次归并产生 / 改动 */
+    @Column(name = "merge_log_id")
+    private Long mergeLogId;
 }
